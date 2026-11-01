@@ -58,13 +58,14 @@ describe("consumption adapter", () => {
 		assert.equal(adapter.stop.callCount, 1);
 	});
 
-	for (let mask = 0; mask < 16; mask++) {
-		it(`supports evaluation options ${mask.toString(2).padStart(4, "0")}`, async () => {
+	for (const medium of ["oil", "water"]) for (let mask = 0; mask < 16; mask++) {
+		it(`supports ${medium} evaluation options ${mask.toString(2).padStart(4, "0")}`, async () => {
+			adapter.config.medium = medium;
 			for (const [index, option] of ["day", "week", "month", "year"].entries()) {
 				adapter.config[option] = Boolean(mask & (1 << index));
 			}
 			await run(new Date(2026, 9, 31, 0, 5));
-			await run(new Date(2026, 10, 1, 0, 5), 990);
+			await run(new Date(2026, 10, 1, 0, 5), medium === "water" ? 1010 : 990);
 			assert.equal(adapter.log.error.callCount, 0);
 			for (const option of ["week", "month", "year"]) {
 				if (!adapter.config[option]) {
@@ -72,13 +73,162 @@ describe("consumption adapter", () => {
 				}
 			}
 			if (adapter.config.day) {
-				const id = adapter.config.month ? "oil.2026.month.10.31.dayValue" : "oil.2026.day.304.dayValue";
+				const id = adapter.config.month ? `${medium}.2026.month.10.31.dayValue` : `${medium}.2026.day.304.dayValue`;
 				assert.equal(states.get(id).val, 10);
 			}
-			if (adapter.config.month) assert.equal(states.get("oil.2026.month.10.monthValue").val, 10);
-			if (adapter.config.year) assert.equal(states.get("oil.2026.year.yearValue").val, 10);
+			if (adapter.config.month) assert.equal(states.get(`${medium}.2026.month.10.monthValue`).val, 10);
+			if (adapter.config.year) assert.equal(states.get(`${medium}.2026.year.yearValue`).val, 10);
 		});
 	}
+
+	for (const unit of ["L", "m³"]) {
+		it(`preserves fractional water consumption and averages in ${unit}`, async () => {
+			Object.assign(adapter.config, { medium: "water", unit, week: true, month: true, year: true });
+			await run(new Date(2026, 9, 29, 0, 5), 123456.789);
+			await run(new Date(2026, 9, 30, 0, 5), 123456.790);
+			await run(new Date(2026, 9, 31, 0, 5), 123456.792);
+			assert.equal(adapter.log.error.callCount, 0);
+			assert.equal(states.get("water.2026.month.10.29.dayValue").val, 0.001);
+			assert.equal(states.get("water.2026.month.10.30.dayValue").val, 0.002);
+			assert.equal(states.get("water.statistic.AverageTwoDays").val, 0.0015);
+			assert.equal(states.get("water.2026.month.10.monthValue").val, 0.003);
+			assert.equal(states.get("water.2026.week.44.weekValue").val, 0.003);
+			assert.equal(states.get("water.2026.year.yearValue").val, 0.003);
+			assert.equal(objects.get("water.2026.month.10.30.dayValue").common.unit, unit);
+		});
+	}
+
+	it("treats a water meter reset as unknown consumption and resumes from the new reading", async () => {
+		Object.assign(adapter.config, { medium: "water", unit: "m³", month: true, year: true });
+		await run(new Date(2026, 9, 29, 0, 5), 200);
+		await run(new Date(2026, 9, 30, 0, 5), 200.25);
+		await run(new Date(2026, 9, 31, 0, 5), 2);
+		assert.equal(adapter.log.warn.callCount, 1);
+		assert.equal(states.get("water.2026.month.10.30.dayValue").val, null);
+		assert.equal(states.get("water.statistic.AverageDay").val, null);
+		assert.equal(states.get("water.2026.year.yearValue").val, 0.25);
+		assert.equal(states.get("water.2026.calc.dayLastValue").val, 2);
+		await run(new Date(2026, 10, 1, 0, 5), 2.1);
+		assert.equal(states.get("water.2026.month.10.31.dayValue").val, 0.1);
+		assert.equal(states.get("water.2026.year.yearValue").val, 0.35);
+	});
+
+	it("retains water precision through the automatic year change", async () => {
+		Object.assign(adapter.config, { medium: "water", unit: "m³", month: true, year: true });
+		await run(new Date(2026, 11, 31, 0, 5), 100.1);
+		await run(new Date(2027, 0, 1, 0, 5), 100.3);
+		assert.equal(states.get("water.2026.month.12.31.dayValue").val, 0.2);
+		assert.equal(states.get("water.2027.calc.dayLastValue").val, 100.3);
+		await run(new Date(2027, 0, 2, 0, 5), 100.31);
+		assert.equal(states.get("water.2027.year.yearValue").val, 0.01);
+		assert.equal(states.get("water.statistic.AverageTwoDays").val, 0.105);
+	});
+
+	it("records zero water consumption once and includes it in averages", async () => {
+		Object.assign(adapter.config, { medium: "water", unit: "m³" });
+		await run(new Date(2026, 9, 29, 0, 5), 100);
+		await run(new Date(2026, 9, 30, 0, 5), 100.2);
+		await run(new Date(2026, 9, 31, 0, 5), 100.2);
+		await run(new Date(2026, 9, 31, 1, 5), 100.3);
+		assert.equal(states.get("water.2026.day.303.dayValue").val, 0);
+		assert.equal(states.get("water.statistic.AverageTwoDays").val, 0.1);
+		await run(new Date(2026, 10, 1, 0, 5), 100.3);
+		assert.equal(states.get("water.2026.day.304.dayValue").val, 0.1);
+	});
+
+	for (const value of [null, "100", NaN, Infinity, -1]) {
+		it(`rejects invalid water reading ${String(value)} without changing the baseline`, async () => {
+			Object.assign(adapter.config, { medium: "water", unit: "L" });
+			await run(new Date(2026, 9, 31, 0, 5), 100);
+			source = value === null ? null : { val: value };
+			clock.setSystemTime(new Date(2026, 10, 1, 0, 5));
+			start();
+			await ready();
+			assert.equal(adapter.log.error.callCount, 1);
+			assert.equal(states.get("water.2026.calc.dayLastValue").val, 100);
+			assert.equal(states.get("water.calc.lastProcessedDate").val, "2026-10-30");
+		});
+	}
+
+	it("requires a supported water unit", async () => {
+		Object.assign(adapter.config, { medium: "water", unit: "" });
+		await run(new Date(2026, 9, 31, 0, 5), 100);
+		assert.equal(adapter.log.error.callCount, 1);
+		assert.ok(!adapter.getForeignStateAsync.called);
+	});
+
+	it("recovers interrupted water writes without double counting", async () => {
+		Object.assign(adapter.config, { medium: "water", unit: "L", month: true });
+		await run(new Date(2026, 9, 31, 0, 5), 1000);
+		const originalWrite = adapter.setStateAsync;
+		let fail = true;
+		adapter.setStateAsync = async (id, state) => {
+			if (fail && id === "water.2026.calc.monthLastValue") throw new Error("write interrupted");
+			await originalWrite(id, state);
+		};
+		await run(new Date(2026, 10, 1, 0, 5), 1005.25);
+		assert.equal(adapter.log.error.callCount, 1);
+		assert.equal(states.get("water.2026.month.10.monthValue").val, 5.25);
+		fail = false;
+		await run(new Date(2026, 10, 1, 1, 5), 1007);
+		assert.equal(states.get("water.2026.month.10.monthValue").val, 5.25);
+		assert.equal(states.get("water.2026.calc.dayLastValue").val, 1005.25);
+		assert.equal(states.get("water.calc.pendingCalculation").val, "");
+	});
+
+	it("does not accept oil writes in the pending calculation of a water instance", async () => {
+		Object.assign(adapter.config, { medium: "water", unit: "L" });
+		seed("water.calc.pendingCalculation", JSON.stringify([["oil.2026.calc.dayLastValue", 100]]));
+		await run(new Date(2026, 9, 31, 0, 5), 1000);
+		assert.equal(adapter.log.error.callCount, 1);
+		assert.ok(!states.has("oil.2026.calc.dayLastValue"));
+	});
+
+	it("keeps concurrent oil and water instances independent in compact mode", async () => {
+		await run(new Date(2026, 9, 31, 0, 5));
+		const oilReady = ready;
+		const oilStates = states;
+		const waterStates = new Map();
+		const waterObjects = new Map();
+		let waterLevel = 200;
+		adapter = {
+			...adapter,
+			config: { ...defaults, triggerID: "water-sensor", medium: "water", unit: "L" },
+			getForeignStateAsync: async () => ({ val: waterLevel }),
+			getStateAsync: async id => waterStates.get(id) || null,
+			setObjectNotExistsAsync: async (id, object) => {
+				if (!waterObjects.has(id)) waterObjects.set(id, object);
+				if (!waterStates.has(id)) waterStates.set(id, { val: object.common.def });
+			},
+			setStateAsync: async (id, state) => {
+				assert.ok(waterObjects.has(id));
+				waterStates.set(id, state);
+			},
+		};
+		start();
+		const waterReady = ready;
+		await waterReady();
+		clock.setSystemTime(new Date(2026, 10, 1, 0, 5));
+		source = { val: 990 };
+		waterLevel = 205.5;
+		await Promise.all([oilReady(), waterReady()]);
+		assert.equal(adapter.log.error.callCount, 0);
+		assert.equal(oilStates.get("oil.statistic.AverageDay").val, 10);
+		assert.equal(waterStates.get("water.statistic.AverageDay").val, 5.5);
+		assert.ok(![...oilStates.keys()].some(id => id.startsWith("water.")));
+		assert.ok(![...waterStates.keys()].some(id => id.startsWith("oil.")));
+	});
+
+	it("keeps fractional seven-day water averages including a zero day", async () => {
+		Object.assign(adapter.config, { medium: "water", unit: "L" });
+		let level = 1000;
+		await run(new Date(2026, 9, 24, 0, 5), level);
+		for (let day = 25; day <= 31; day++) {
+			if (day !== 25) level += 0.7;
+			await run(new Date(2026, 9, day, 0, 5), level);
+		}
+		assert.equal(states.get("water.statistic.AverageSevenDays").val, 0.6);
+	});
 
 	it("waits for the source before writing the baseline or stopping", async () => {
 		let releaseRead;

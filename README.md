@@ -20,8 +20,9 @@ Your total consumption from the start of the adapter.
 
 ### Berechnung und gespeicherte Werte
 
-Der Adapter unterstützt derzeit Öl. Die Quelle muss einen endlichen numerischen
-Tankfüllstand liefern. Tages-, Wochen-, Monats- und Jahresauswertung können
+Der Adapter unterstützt Öl und Wasser in getrennten Instanzen. Die Quelle muss
+einen endlichen numerischen Tankfüllstand für Öl beziehungsweise einen
+fortlaufenden Gesamtzählerstand für Wasser liefern. Tages-, Wochen-, Monats- und Jahresauswertung können
 unabhängig aktiviert werden. Ohne Monatsauswertung liegen Tageswerte unter
 `oil.<Jahr>.day.<TagDesJahres>.dayValue`, mit Monatsauswertung unter
 `oil.<Jahr>.month.<Monat>.<Tag>.dayValue`. Wochen verwenden ISO-Kalenderwoche und
@@ -46,6 +47,30 @@ Statistiken benötigen eine vollständige Folge von einem, zwei beziehungsweise
 sieben Tagen. Fehlende Werte ergeben `null`; ein bekannter Verbrauch von null
 Litern zählt mit. Die bestehenden Nachfüllschwellen bleiben unverändert.
 
+### Wasserzähler einrichten
+
+Für Wasser eine zusätzliche Instanz anlegen, beispielsweise `verbrauchszaehler.1`,
+und die vorhandene Öl-Instanz weiterverwenden. In der neuen Instanz:
+
+1. Als Medium **Wasser** wählen.
+2. Den Datenpunkt mit dem fortlaufenden Gesamtzählerstand auswählen.
+3. **L** oder **m³** passend zur Quelle wählen. Die Werte werden in dieser Einheit
+   gespeichert; eine automatische Umrechnung erfolgt nicht.
+4. Gewünschte Tages-, Wochen-, Monats- und Jahresauswertungen aktivieren.
+
+Die Wasserwerte liegen unter `verbrauchszaehler.<Instanz>.water`, mit derselben
+Struktur wie bei Öl. Beispielsweise enthält `water.statistic.AverageDay` den
+Verbrauch des Vortags. Berechnet wird die Zunahme des Gesamtzählerstands.
+Differenzen, Summen und Durchschnitte erhalten bis zu sechs Nachkommastellen;
+die Ölberechnung einschließlich Nachfüllerkennung bleibt unverändert.
+
+Beim ersten Start wird der aktuelle Zählerstand als Ausgangswert übernommen.
+Ein sinkender Wasserzählerstand wird als Reset oder Zählerwechsel behandelt:
+Der neue Stand wird zur Basis, der betroffene Tag bleibt unbekannt (`null`) und
+die vorhandenen Summen bleiben erhalten. Verbrauch während dieses Intervalls
+lässt sich ohne weitere Messwerte nicht rekonstruieren. Negative Zählerstände,
+Tagesverbrauchswerte und einzelne Impulse eignen sich nicht als Quelle.
+
 ### Development checks
 
 Install the locked dependencies with `npm ci`, then run `npm test`.
@@ -68,7 +93,10 @@ and the physical tank sensor still need a manual check before deployment.
   Placeholder for the next version (at the beginning of the line):
   ### **WORK IN PROGRESS**
 -->
-### **WORK IN PROGRESS**
+### 0.0.12 (2026-11-01)
+* (proper0912) Add cumulative water meter support in separate instances, using litres or cubic metres without automatic unit conversion.
+* (proper0912) Preserve fractional water consumption, period totals and daily averages; handle meter resets without inventing consumption.
+* (proper0912) Add regression coverage for water evaluation options, year changes, write recovery and independent oil/water instances.
 * (proper0912) Repair GitHub Actions with Node.js 22/24 platform tests, Linux compatibility tests for Node.js 14/16, and the existing adapter and package test commands; remove the duplicate legacy workflow.
 
 ### 0.0.11 (2026-11-01)

@@ -1,8 +1,12 @@
 {
   "common": {
     "name": "verbrauchszaehler",
-    "version": "0.0.11",
+    "version": "0.0.12",
     "news": {
+      "0.0.12": {
+        "en": "(proper0912) Add cumulative water meters in separate instances with decimal consumption, reset handling and regression tests; repair GitHub Actions.",
+        "de": "(proper0912) Wasser-Gesamtzähler in getrennten Instanzen mit Nachkommastellen, Reset-Behandlung und Regressionstests ergänzt; GitHub Actions repariert."
+      },
       "0.0.11": {
         "en": "Fix daily consumption attribution, period rollover, source reads and statistics; recover interrupted writes and improve tests and linting.",
         "de": "Tageszuordnung, Periodenwechsel, Messwertabfragen und Statistiken korrigiert; unterbrochene Schreibvorgänge abgesichert sowie Tests und Linting verbessert."

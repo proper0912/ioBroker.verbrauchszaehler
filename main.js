@@ -9,8 +9,11 @@ function startAdapter(options = {}) {
 		name: adapterName,
 		ready: async () => {
 			try {
-				if (!adapter.config.triggerID || adapter.config.medium !== "oil") {
-					throw new Error("Configure a triggerID and the supported medium oil");
+				if (!adapter.config.triggerID || !["oil", "water"].includes(adapter.config.medium)) {
+					throw new Error("Configure a triggerID and the medium oil or water");
+				}
+				if (adapter.config.medium === "water" && !["L", "m³"].includes(adapter.config.unit)) {
+					throw new Error("Configure the water source unit: L or m³");
 				}
 				await main(adapter);
 			} catch (err) {
@@ -127,7 +130,9 @@ async function main(adapter) {
 	await ensureState(adapter, `${root}.connect`, "boolean", false);
 	await write(adapter, `${root}.connect`, false);
 	const source = await adapter.getForeignStateAsync(config.triggerID);
-	if (!numeric(source)) throw new Error(`Source ${config.triggerID} must contain a finite numeric value`);
+	if (!numeric(source) || config.medium === "water" && source.val < 0) {
+		throw new Error(`Source ${config.triggerID} must contain a finite numeric value${config.medium === "water" ? " greater than or equal to zero" : ""}`);
+	}
 
 	await ensureState(adapter, `${root}.calc.pendingCalculation`, "string", "");
 	const pending = await adapter.getStateAsync(`${root}.calc.pendingCalculation`);
@@ -167,7 +172,7 @@ async function main(adapter) {
 		if (alive && alive.val) adapter.log.warn("Missing consumption baseline; initializing without inventing historical consumption");
 		writes.push([`${calcPath(config, year)}.dayLastValue`, source.val], [markerPath, key]);
 	} else if (!processed || processed < key) {
-		writes.push(...await calcValueOil(adapter, yesterday, baseline.val, source.val));
+		writes.push(...await calcValue(adapter, yesterday, baseline.val, source.val));
 		writes.push([`${calcPath(config, year)}.dayLastValue`, source.val], [markerPath, key]);
 	} else {
 		// Carry the baseline into the new year even when the previous day was already processed.
@@ -262,9 +267,18 @@ async function applyPending(adapter, serialized) {
 	await write(adapter, path, "");
 }
 
-async function calcValueOil(adapter, date, previous, current) {
+function consumptionPrecision(config, value) {
+	return config.medium === "water" ? Number(value.toFixed(6)) : value;
+}
+
+async function calcValue(adapter, date, previous, current) {
 	const config = adapter.config;
-	const value = oilConsumption(current, previous);
+	if (config.medium === "water" && current < previous) {
+		adapter.log.warn(`Water meter reading decreased; resetting the baseline. Consumption for ${dateKey(date)} is unknown.`);
+		return [];
+	}
+	const value = config.medium === "water"
+		? consumptionPrecision(config, current - previous) : oilConsumption(current, previous);
 	const root = `${config.medium}.${date.getFullYear()}`;
 	const writes = [[`${calcPath(config, date.getFullYear())}.dayDiffValue`, value]];
 	if (config.day) writes.push([dayPath(config, date), value]);
@@ -272,20 +286,20 @@ async function calcValueOil(adapter, date, previous, current) {
 		const { year, week } = isoWeek(date);
 		const path = `${config.medium}.${year}.week.${week}`;
 		const total = await adapter.getStateAsync(`${path}.weekValue`);
-		const sum = (numeric(total) ? total.val : 0) + value;
+		const sum = consumptionPrecision(config, (numeric(total) ? total.val : 0) + value);
 		writes.push([`${path}.${(date.getDay() + 6) % 7 + 1}.dayValue`, value],
 			[`${path}.weekValue`, sum], [`${root}.calc.weekLastValue`, sum], [`${root}.calc.weekDiffValue`, sum]);
 	}
 	if (config.month) {
 		const path = `${root}.month.${date.getMonth() + 1}.monthValue`;
 		const total = await adapter.getStateAsync(path);
-		const sum = (numeric(total) ? total.val : 0) + value;
+		const sum = consumptionPrecision(config, (numeric(total) ? total.val : 0) + value);
 		writes.push([path, sum], [`${root}.calc.monthLastValue`, sum], [`${root}.calc.monthDiffValue`, sum]);
 	}
 	if (config.year) {
 		const path = `${root}.year.yearValue`;
 		const total = await adapter.getStateAsync(path);
-		const sum = (numeric(total) ? total.val : 0) + value;
+		const sum = consumptionPrecision(config, (numeric(total) ? total.val : 0) + value);
 		writes.push([path, sum], [`${root}.calc.yearLastValue`, sum], [`${root}.calc.yearDiffValue`, sum]);
 	}
 	return writes;
@@ -301,8 +315,12 @@ async function newstastic(adapter, today) {
 		const path = `${adapter.config.medium}.statistic.${name}`;
 		await ensureState(adapter, path);
 		const window = days.slice(0, count);
-		const value = window.every(day => day !== null)
-			? count === 1 ? window[0] : Math.round(window.reduce((sum, day) => sum + day, 0) / count) : null;
+		let value = null;
+		if (window.every(day => day !== null)) {
+			const average = window.reduce((sum, day) => sum + day, 0) / count;
+			value = adapter.config.medium === "water" ? consumptionPrecision(adapter.config, average)
+				: count === 1 ? average : Math.round(average);
+		}
 		await write(adapter, path, value);
 	}
 }
