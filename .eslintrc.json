@@ -6,17 +6,29 @@
 		"mocha": true
 	},
 	"extends": [
-		"eslint:recommended",
-		"plugin:react/recommended"
+		"eslint:recommended"
 	],
-	"plugins": [
-		"react"
-	],
-	"settings": {
-		"react": {
-			"version": "detect"
+	"overrides": [
+		{
+			"files": ["admin/**/*.js", "admin/**/*.jsx"],
+			"env": { "browser": true, "node": false, "mocha": false }
+		},
+		{
+			"files": ["admin/index_m.js"],
+			"globals": { "$": "readonly", "M": "readonly", "socket": "readonly", "_": "readonly" }
+		},
+		{
+			"files": ["admin/words.js"],
+			"rules": { "indent": ["error", 2] }
+		},
+		{
+			"files": ["admin/src/**/*.jsx"],
+			"extends": ["plugin:react/recommended"],
+			"parserOptions": { "sourceType": "module" },
+			"settings": { "react": { "version": "detect" } },
+			"globals": { "require": "readonly" }
 		}
-	},
+	],
 	"rules": {
 		"indent": [
 			"error",

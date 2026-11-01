@@ -23,12 +23,12 @@ Details, Dateien, Abnahmekriterien und Risiken: siehe `plan.md`.
 
 ## Ergebnisse der Umsetzung
 
-- `npm ci --ignore-scripts --no-audit --no-fund`: erfolgreich; keine neuen Abhängigkeiten und keine Lockfile-Änderung.
+- Ursprüngliche Fehlerkorrektur: Installation mit `npm ci` ohne zusätzliche Laufzeitabhängigkeiten. Im anschließenden Lint-Auftrag wurden `eslint-plugin-react` und `prop-types` als Entwicklungsabhängigkeiten ergänzt und der Lockfile aktualisiert.
 - `npm test`: 69 Verhaltenstests und 38 Paketprüfungen erfolgreich.
 - `node --check main.js` und `node --check main.test.js`: erfolgreich.
 - `git diff --check` und `npm pack --dry-run`: erfolgreich.
 - Backend-Lint für `main.js`, `main.test.js` und `test/package.test.js`: erfolgreich mit den vorhandenen Repository-Regeln ohne das fehlende React-Plugin.
-- `npm run lint`: weiterhin durch das bereits zuvor fehlende `eslint-plugin-react` blockiert. Das Skript prüft nun tatsächlich das Projektverzeichnis.
+- `npm run lint`: erfolgreich für das gesamte Projekt. Browser-/JSX-Konfiguration, bereitgestellte Admin-Globals und PropTypes sind korrigiert; ungenutzte Zählerfunktionen entfernt. Es bleibt der Hinweis, dass React für die ungenutzte JSX-Vorlage nicht installiert ist; der Lintlauf endet erfolgreich.
 - Mutationsprüfung: Eine absichtlich erlaubte erneute Tagesverarbeitung wird von beiden betroffenen Regressionstests erkannt; anschließend Originalcode wiederhergestellt.
 - Reale ioBroker-Instanz und Hardware: nicht getestet. Kein Deployment und keine Veröffentlichung durchgeführt.
 
@@ -39,3 +39,9 @@ Zusätzliche Absicherung: Verarbeitungstag und ausstehende absolute Schreibwerte
 Die nachgereichten Füllstände (28.10.: 383 L, 29.10.: 379 L, 30.10.: 374 L, 31.10.: 368 L) wurden mit stündlichen Adapterläufen und einer täglichen Sensoränderung tagsüber nachgestellt. Der unveränderte ursprüngliche Berechnungscode aus HEAD reproduziert die Screenshots exakt: Tageswerte 28./29./30./31. Oktober = 4/5/6/0 L und AverageDay = 0 L. Die ursprüngliche Berechnung verbucht eine erst tagsüber erkannte Abnahme bereits beim Vortag.
 
 Der korrigierte Code besteht denselben Ablauf mit Tageswerten 29./30./31. Oktober = 4/5/6 L und AverageDay am 1. November = 6 L. Der Fall ist als zusätzlicher Regressionstest in main.test.js gespeichert. Die genaue Uhrzeit der echten Sensormessungen ist weiterhin unbekannt; der Nachstellversuch verwendet eine Änderung um 12 Uhr. Die korrigierte Version ist noch nicht in der laufenden ioBroker-Installation installiert; historische Werte wurden nicht geändert.
+
+## Nachauftrag: Lint und Bereitstellung
+
+Vollständiges Linting, alle 107 Tests und Paketvorschau bestehen. React-Regeln gelten nur für die JSX-Quellen; Browser-Globals werden ausdrücklich deklariert. Die produktive Oberfläche bleibt die bestehende Materialize-Seite. Die Entwicklungsabhängigkeiten werden nicht zu Laufzeitabhängigkeiten des Adapters.
+
+Ein direkter Zugriff auf den ioBroker-Host aus den Screenshots ist hier nicht eingerichtet beziehungsweise nicht erreichbar. Der Nutzer bevorzugt einen Weg ohne Fernzugriff. Nach dem Push kann die bestehende Instanz über Admin → Adapter → Aus eigener Quelle installieren → Benutzerdefiniert mit der GitHub-Repository-URL aktualisiert werden. Der Installationsschritt und der reale Betrieb bleiben bis dahin ausstehend.

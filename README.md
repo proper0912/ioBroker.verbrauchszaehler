@@ -49,6 +49,7 @@ Litern zählt mit. Die bestehenden Nachfüllschwellen bleiben unverändert.
 ### Development checks
 
 Install the locked dependencies with `npm ci`, then run `npm test`.
+Run `npm run lint` to check both the adapter and admin sources.
 The tests simulate ioBroker, source failures, interrupted writes, evaluation
 options and calendar boundaries, including daylight saving time in Europe/Berlin.
 `npm pack --dry-run` checks the published file list. A real ioBroker installation

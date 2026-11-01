@@ -129,4 +129,4 @@ Abhängigkeit: 5.
 - Hardwarekalibrierung und die bestehende Erkennung von Ölnachfüllmengen bleiben außerhalb dieses Plans. Regressionsfälle für normale Abnahme und eine vorhandene Nachfüllstufe schützen vor unbeabsichtigten Änderungen.
 - Aktuell sind keine Abhängigkeiten installiert. Tests mit echten Bibliotheken und ein realer ioBroker-Betrieb wurden in der bisherigen Prüfung nicht ausgeführt.
 
-Die umsetzbare Checkliste steht in `tasks/todo.md`. Die Umsetzung wurde im anschließenden Arbeitsauftrag ausgeführt. Der vollständige Projekt-Lint bleibt wegen des fehlenden React-Plugins blockiert; ein realer ioBroker-Test steht aus.
+Die umsetzbare Checkliste steht in `tasks/todo.md`. Die Umsetzung wurde im anschließenden Arbeitsauftrag ausgeführt. Der vollständige Projekt-Lint wurde im Nachauftrag repariert und besteht; ein realer ioBroker-Test steht aus.

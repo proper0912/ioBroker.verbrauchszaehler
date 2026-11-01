@@ -5,9 +5,9 @@ import GenericApp from "@iobroker/adapter-react/GenericApp";
 import Settings from "./components/settings";
 
 /**
- * @type {(_theme: Theme) => import("@material-ui/styles").StyleRules}
+ * @type {() => import("@material-ui/styles").StyleRules}
  */
-const styles = (_theme) => ({
+const styles = () => ({
 	root: {},
 });
 

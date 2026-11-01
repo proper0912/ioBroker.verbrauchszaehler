@@ -1,4 +1,5 @@
 /*global systemDictionary:true */
+/* exported systemDictionary */
 "use strict";
 
 systemDictionary = {

@@ -1,4 +1,5 @@
 import React from "react";
+import PropTypes from "prop-types";
 import { withStyles } from "@material-ui/core/styles";
 import TextField from "@material-ui/core/TextField";
 import Input from "@material-ui/core/Input";
@@ -151,5 +152,11 @@ class Settings extends React.Component {
 		);
 	}
 }
+
+Settings.propTypes = {
+	classes: PropTypes.object.isRequired,
+	native: PropTypes.object.isRequired,
+	onChange: PropTypes.func.isRequired,
+};
 
 export default withStyles(styles)(Settings);
