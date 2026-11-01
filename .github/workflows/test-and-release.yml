@@ -23,24 +23,35 @@ jobs:
     steps:
       - uses: ioBroker/testing-action-check@v1
         with:
-          node-version: '14.x'
+          node-version: '22.x'
           lint: true
 
-  # Runs adapter tests on all supported node versions and OSes
+  # Runs the adapter behaviour and package tests across platforms
   adapter-tests:
     if: contains(github.event.head_commit.message, '[skip ci]') == false
 
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
-        node-version: [12.x, 14.x, 16.x]
+        node-version: [22.x, 24.x]
         os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - node-version: 14.x
+            os: ubuntu-latest
+          - node-version: 16.x
+            os: ubuntu-latest
 
     steps:
-      - uses: ioBroker/testing-action-adapter@v1
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: ${{ matrix.node-version }}
-          os: ${{ matrix.os }}
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Run adapter behaviour and package tests
+        run: npm test
 
   deploy:
     needs: [check-and-lint, adapter-tests]
@@ -54,7 +65,7 @@ jobs:
     steps:
       - uses: ioBroker/testing-action-deploy@v1
         with:
-          node-version: '14.x'
+          node-version: '22.x'
           npm-token: ${{ secrets.NPM_TOKEN }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 #

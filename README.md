@@ -68,6 +68,9 @@ and the physical tank sensor still need a manual check before deployment.
   Placeholder for the next version (at the beginning of the line):
   ### **WORK IN PROGRESS**
 -->
+### **WORK IN PROGRESS**
+* (proper0912) Repair GitHub Actions with Node.js 22/24 platform tests, Linux compatibility tests for Node.js 14/16, and the existing adapter and package test commands; remove the duplicate legacy workflow.
+
 ### 0.0.11 (2026-11-01)
 * (proper0912) Fix daily consumption being assigned one day too early and the resulting zero in yesterday's statistics.
 * (proper0912) Fix independent evaluation options, month/year rollover, ISO week years and daylight saving time handling.
