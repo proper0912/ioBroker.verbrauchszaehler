@@ -93,6 +93,9 @@ and the physical tank sensor still need a manual check before deployment.
   Placeholder for the next version (at the beginning of the line):
   ### **WORK IN PROGRESS**
 -->
+### **WORK IN PROGRESS**
+* (proper0912) Enable token-free npm trusted publishing and allow a verified existing release tag to be published manually without changing the tag or GitHub release notes.
+
 ### 0.0.12 (2026-11-01)
 * (proper0912) Add cumulative water meter support in separate instances, using litres or cubic metres without automatic unit conversion.
 * (proper0912) Preserve fractional water consumption, period totals and daily averages; handle meter resets without inventing consumption.
