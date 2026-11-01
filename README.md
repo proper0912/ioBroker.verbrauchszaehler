@@ -68,6 +68,12 @@ and the physical tank sensor still need a manual check before deployment.
   Placeholder for the next version (at the beginning of the line):
   ### **WORK IN PROGRESS**
 -->
+### 0.0.11 (2026-11-01)
+* Fix daily consumption being assigned one day too early and the resulting zero in yesterday's statistics.
+* Fix independent evaluation options, month/year rollover, ISO week years and daylight saving time handling.
+* Await and validate source readings; recover interrupted writes without counting consumption twice.
+* Add regression tests and repair project-wide linting.
+
 ###  0.0.10  (2022-12-29)
 * (proper0912) Added oil refill automatic / Statistic for 1,2 and 7 Days / Improved structure
 

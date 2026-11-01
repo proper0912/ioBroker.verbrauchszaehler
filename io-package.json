@@ -1,8 +1,12 @@
 {
   "common": {
     "name": "verbrauchszaehler",
-    "version": "0.0.10",
+    "version": "0.0.11",
     "news": {
+      "0.0.11": {
+        "en": "Fix daily consumption attribution, period rollover, source reads and statistics; recover interrupted writes and improve tests and linting.",
+        "de": "Tageszuordnung, Periodenwechsel, Messwertabfragen und Statistiken korrigiert; unterbrochene Schreibvorgänge abgesichert sowie Tests und Linting verbessert."
+      },
       "0.0.10": {
         "en": "Added oil refill automatic / Statistic for 1,2 and 7 Days / Improved structure",
         "de": "Ölnachfüllautomatik hinzugefügt / Statistik für 1,2 und 7 Tage / Verbesserte Struktur",
