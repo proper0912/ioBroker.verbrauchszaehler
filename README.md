@@ -18,6 +18,42 @@ Consumption meters for oil and water
 Here you can see your current daily consumption.
 Your total consumption from the start of the adapter.
 
+### Berechnung und gespeicherte Werte
+
+Der Adapter unterstützt derzeit Öl. Die Quelle muss einen endlichen numerischen
+Tankfüllstand liefern. Tages-, Wochen-, Monats- und Jahresauswertung können
+unabhängig aktiviert werden. Ohne Monatsauswertung liegen Tageswerte unter
+`oil.<Jahr>.day.<TagDesJahres>.dayValue`, mit Monatsauswertung unter
+`oil.<Jahr>.month.<Monat>.<Tag>.dayValue`. Wochen verwenden ISO-Kalenderwoche und
+ISO-Wochenjahr; Monats- und Jahreswerte gehören zum ausgewerteten Kalendertag.
+
+Beim ersten Start wird der aktuelle Füllstand als Berechnungsbasis gespeichert.
+Der Adapter läuft weiterhin stündlich und ordnet die erste Berechnung für einen
+neuen Tag dem Vortag zu. Weitere Läufe am selben Tag addieren nichts erneut.
+Bei einem Quellfehler bleibt die Berechnungsbasis erhalten. Ausfallzeiten können
+ohne historische Quellmesswerte nicht auf einzelne Tage aufgeteilt werden;
+die nächste Differenz wird weiterhin dem zuletzt ausgewerteten Vortag zugeordnet.
+
+Die zusätzlichen internen Zustände `oil.calc.lastProcessedDate` und
+`oil.calc.pendingCalculation` verhindern doppelte Verarbeitung und erlauben das
+Fortsetzen unterbrochener Schreibvorgänge. Diese Zustände nicht manuell ändern.
+Vorhandene Datenpunkt-IDs und Historien werden nicht gelöscht oder automatisch
+neu berechnet. Bereits falsche Summen bleiben bis zu einer gezielten Korrektur
+erhalten. Bei älteren Versionen können vorbelegte Nullwerte nicht nachträglich
+von tatsächlich berechneten Nullverbräuchen unterschieden werden.
+
+Statistiken benötigen eine vollständige Folge von einem, zwei beziehungsweise
+sieben Tagen. Fehlende Werte ergeben `null`; ein bekannter Verbrauch von null
+Litern zählt mit. Die bestehenden Nachfüllschwellen bleiben unverändert.
+
+### Development checks
+
+Install the locked dependencies with `npm ci`, then run `npm test`.
+The tests simulate ioBroker, source failures, interrupted writes, evaluation
+options and calendar boundaries, including daylight saving time in Europe/Berlin.
+`npm pack --dry-run` checks the published file list. A real ioBroker installation
+and the physical tank sensor still need a manual check before deployment.
+
 
 ### **Work in Progress**
 ####  0.0.10  (2023-01 2023-12)

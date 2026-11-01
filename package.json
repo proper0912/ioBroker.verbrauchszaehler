@@ -56,15 +56,14 @@
     "LICENSE",
     "main.js"
   ],"scripts": {
-    "lint": "eslint --ext .js,.jsx",
+    "lint": "eslint . --ext .js,.jsx",
     "release": "release-script",
     "release-major": "release-script major --yes",
     "release-minor": "release-script minor --yes",
     "release-patch": "release-script patch --yes",
     "test": "npm run test:js && npm run test:package",
-    "test:integration": "mocha test/integration --exit",
-    "test:js": "mocha --config test/mocharc.custom.json \"{!(node_modules|test)/**/*.test.js,*.test.js,test/**/test!(PackageFiles|Startup).js}\"",
-    "test:package": "mocha test/package --exit",
+    "test:js": "mocha main.test.js",
+    "test:package": "mocha test/package.test.js --exit",
     "translate": "translate-adapter"
   },
   "bugs": {
