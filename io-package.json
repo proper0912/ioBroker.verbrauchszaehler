@@ -1,8 +1,12 @@
 {
   "common": {
     "name": "verbrauchszaehler",
-    "version": "0.0.14",
+    "version": "0.0.15",
     "news": {
+      "0.0.15": {
+        "en": "(proper0912) Clear legacy units from the year state independently of conversion for oil and water.",
+        "de": "(proper0912) Alte Einheiten am Jahres-Datenpunkt für Öl und Wasser unabhängig von der Umrechnung entfernen."
+      },
       "0.0.14": {
         "en": "(proper0912) Apply conversion to all existing measurement data points and safely migrate stored adapter values and unit metadata with interruption recovery.",
         "de": "(proper0912) Umrechnung auf alle bisherigen Messwert-Datenpunkte anwenden und gespeicherte Adapterwerte samt Einheiten mit Wiederaufnahme nach Abbrüchen umstellen."

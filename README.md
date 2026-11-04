@@ -122,6 +122,9 @@ and the physical tank sensor still need a manual check before deployment.
 -->
 ### **WORK IN PROGRESS**
 
+### 0.0.15 (2026-11-04)
+* (proper0912) Remove legacy volume units from the year data point on every successful run for oil and water, independently of output conversion; preserve measurement units and the automatic year change.
+
 ### 0.0.14 (2026-11-04)
 * (proper0912) Apply the selected output unit directly to all existing measurement data points, including readings, daily and period totals, statistics and calculation baselines; preserve oil refill calibration.
 * (proper0912) Migrate stored adapter values and unit metadata across all years with durable replay after interrupted writes; retain unknown values and legacy initialization markers, and stop updating the additional converted data points.

@@ -66,6 +66,19 @@ describe("consumption adapter", () => {
 		assert.equal(adapter.stop.callCount, 1);
 	});
 
+	for (const medium of ["oil", "water"]) {
+		it(`removes a legacy unit from the ${medium} year without enabling conversion`, async () => {
+			adapter.config.medium = medium;
+			seed("year", 2026);
+			objects.get("year").common.unit = "m³";
+			await run(new Date(2026, 10, 4, 0, 5));
+			assert.equal(adapter.log.error.callCount, 0);
+			assert.equal(states.get("year").val, 2026);
+			assert.equal(objects.get("year").common.unit, "");
+			assert.equal(objects.get(`${medium}.instanceValue`).common.unit, "L");
+		});
+	}
+
 	for (const medium of ["oil", "water"]) for (let mask = 0; mask < 16; mask++) {
 		it(`supports ${medium} evaluation options ${mask.toString(2).padStart(4, "0")}`, async () => {
 			adapter.config.medium = medium;
@@ -383,6 +396,11 @@ describe("consumption adapter", () => {
 			config: { ...defaults, triggerID: "water-sensor", medium: "water", unit: "L" },
 			getForeignStateAsync: async () => ({ val: waterLevel }),
 			getStateAsync: async id => waterStates.get(id) || null,
+			extendObjectAsync: async (id, change) => {
+				const object = waterObjects.get(id);
+				assert.ok(object);
+				object.common = { ...object.common, ...change.common };
+			},
 			setObjectNotExistsAsync: async (id, object) => {
 				if (!waterObjects.has(id)) waterObjects.set(id, object);
 				if (!waterStates.has(id)) waterStates.set(id, { val: object.common.def });

@@ -136,8 +136,6 @@ async function applyUnitMigration(adapter, serialized) {
 		await adapter.setStateAsync(id, { val, ack: true });
 		await adapter.extendObjectAsync(id, { common: { unit: plan.unit } });
 	}
-	await ensureState(adapter, "year", "number", 0);
-	await adapter.extendObjectAsync("year", { common: { unit: "" } });
 	const unitPath = `${adapter.config.medium}.calc.outputUnit`;
 	await ensureState(adapter, unitPath, "string", "");
 	await write(adapter, unitPath, plan.unit);
@@ -236,6 +234,7 @@ async function main(adapter) {
 
 	await ensureState(adapter, "alive", "boolean", false);
 	await ensureState(adapter, "year", "number", 0);
+	await adapter.extendObjectAsync("year", { common: { unit: "" } });
 	await ensureState(adapter, markerPath, "string", "");
 	await ensureState(adapter, `${root}.instanceValue`);
 	if (!initialized || previousYear !== year) await ensureYear(adapter, year);
