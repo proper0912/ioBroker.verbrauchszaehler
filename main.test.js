@@ -16,6 +16,7 @@ describe("consumption adapter", () => {
 		objects = new Map();
 		source = { val: 1000 };
 		adapter = {
+			namespace: "verbrauchszaehler.0",
 			config: { ...defaults, medium: "oil", triggerID: "sensor", unit: "L" },
 			log: { debug: sinon.spy(), info: sinon.spy(), warn: sinon.spy(), error: sinon.spy() },
 			stop: sinon.spy(),
@@ -23,6 +24,7 @@ describe("consumption adapter", () => {
 			subscribeStates() {},
 			getForeignStateAsync: sinon.stub().callsFake(async () => source),
 			getStateAsync: sinon.spy(async id => states.get(id) || null),
+			getStatesAsync: sinon.spy(async () => Object.fromEntries([...states].map(([id, state]) => [`${adapter.namespace}.${id}`, state]))),
 			setObjectNotExistsAsync: sinon.spy(async (id, object) => {
 				if (!objects.has(id)) objects.set(id, object);
 				if (!states.has(id)) states.set(id, { val: object.common.def });
@@ -97,6 +99,83 @@ describe("consumption adapter", () => {
 			assert.equal(objects.get("water.2026.month.10.30.dayValue").common.unit, unit);
 		});
 	}
+
+	it("keeps initialization unknown until the next day and converts the reported water readings to litres", async () => {
+		Object.assign(adapter.config, { medium: "water", unit: "m³", convert: true, convertunit: "L", week: true, month: true, year: true });
+		await run(new Date(2026, 10, 2, 12), 644.910);
+		await run(new Date(2026, 10, 2, 13), 644.910);
+		assert.equal(states.get("water.statistic.AverageDay").val, null);
+		assert.equal(states.get("water.converted.L.statistic.AverageDay").val, null);
+		await run(new Date(2026, 10, 3, 12), 644.911);
+		assert.equal(adapter.log.error.callCount, 0);
+		assert.equal(states.get("water.statistic.AverageDay").val, 0.001);
+		assert.equal(states.get("water.converted.L.statistic.AverageDay").val, 1);
+		assert.equal(states.get("water.converted.L.2026.month.11.2.dayValue").val, 1);
+		assert.equal(states.get("water.converted.L.2026.month.11.monthValue").val, 1);
+		assert.equal(states.get("water.converted.L.2026.week.45.weekValue").val, 1);
+		assert.equal(states.get("water.converted.L.2026.year.yearValue").val, 1);
+		assert.equal(states.get("water.converted.L.instanceValue").val, 644911);
+		assert.equal(states.get("water.2026.calc.dayLastValue").val, 644.911);
+		assert.equal(objects.get("water.converted.L.statistic.AverageDay").common.unit, "L");
+		assert.equal(objects.get("water.converted.L.statistic.AverageDay").common.write, false);
+		assert.ok(!states.has("water.converted.L.calc.lastProcessedDate"));
+		assert.ok(!states.has("water.converted.L.converted.L.instanceValue"));
+		const count = adapter.setStateAsync.args.filter(([id]) => id.startsWith("water.converted.")).length;
+		await run(new Date(2026, 10, 3, 13), 644.911);
+		assert.equal(adapter.setStateAsync.args.filter(([id]) => id.startsWith("water.converted.")).length, count);
+	});
+
+	for (const [unit, convertunit, amount, expected] of [["L", "m³", 1, 0.001], ["m³", "L", 0.1, 100], ["L", "L", 0, 0]]) {
+		it(`converts ${amount} ${unit} to ${expected} ${convertunit} without changing raw history`, async () => {
+			Object.assign(adapter.config, { medium: "water", unit });
+			await run(new Date(2026, 10, 2, 0, 5), 644.91);
+			await run(new Date(2026, 10, 3, 0, 5), 644.91 + amount);
+			Object.assign(adapter.config, { convert: true, convertunit });
+			await run(new Date(2026, 10, 3, 1, 5), 644.91 + amount);
+			const target = `water.converted.${convertunit === "L" ? "L" : "m3"}`;
+			assert.equal(adapter.log.error.callCount, 0);
+			assert.equal(states.get(`${target}.2026.day.306.dayValue`).val, expected);
+			assert.equal(states.get(`${target}.statistic.AverageDay`).val, expected);
+			assert.equal(states.get("water.2026.day.306.dayValue").val, amount);
+			assert.equal(states.get("water.2026.calc.dayLastValue").val, 644.91 + amount);
+		});
+	}
+
+	it("rebuilds interrupted conversion writes and changes target units without changing period totals", async () => {
+		Object.assign(adapter.config, { medium: "water", unit: "m³", month: true });
+		await run(new Date(2026, 10, 2, 0, 5), 644.91);
+		Object.assign(adapter.config, { convert: true, convertunit: "L" });
+		const original = adapter.setStateAsync;
+		let fail = true;
+		adapter.setStateAsync = async (id, state) => {
+			if (fail && id === "water.converted.L.2026.month.11.2.dayValue") throw new Error("conversion interrupted");
+			return original(id, state);
+		};
+		await run(new Date(2026, 10, 3, 0, 5), 645.01);
+		assert.equal(adapter.log.error.callCount, 1);
+		fail = false;
+		await run(new Date(2026, 10, 3, 1, 5), 645.01);
+		assert.equal(states.get("water.converted.L.2026.month.11.monthValue").val, 100);
+		adapter.config.convertunit = "m³";
+		await run(new Date(2026, 10, 3, 2, 5), 645.01);
+		assert.equal(states.get("water.converted.m3.2026.month.11.monthValue").val, 0.1);
+		assert.equal(states.get("water.2026.month.11.monthValue").val, 0.1);
+	});
+
+	it("converts oil results without changing litre refill calibration", async () => {
+		Object.assign(adapter.config, { convert: true, convertunit: "m³" });
+		await run(new Date(2026, 10, 2, 0, 5), 1000);
+		await run(new Date(2026, 10, 3, 0, 5), 1490);
+		assert.equal(states.get("oil.statistic.AverageDay").val, 10);
+		assert.equal(states.get("oil.converted.m3.statistic.AverageDay").val, 0.01);
+	});
+
+	it("rejects an invalid conversion unit before calculating consumption", async () => {
+		Object.assign(adapter.config, { medium: "water", unit: "m³", convert: true, convertunit: "" });
+		await run(new Date(2026, 10, 2, 0, 5), 644.91);
+		assert.equal(adapter.log.error.callCount, 1);
+		assert.equal(states.size, 0);
+	});
 
 	it("treats a water meter reset as unknown consumption and resumes from the new reading", async () => {
 		Object.assign(adapter.config, { medium: "water", unit: "m³", month: true, year: true });

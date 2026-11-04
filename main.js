@@ -15,6 +15,10 @@ function startAdapter(options = {}) {
 				if (adapter.config.medium === "water" && !["L", "m³"].includes(adapter.config.unit)) {
 					throw new Error("Configure the water source unit: L or m³");
 				}
+				if (adapter.config.convert && (!["L", "m³"].includes(adapter.config.unit)
+					|| !["L", "m³"].includes(adapter.config.convertunit))) {
+					throw new Error("Configure conversion source and target units: L or m³");
+				}
 				await main(adapter);
 			} catch (err) {
 				adapter.log.error(`Consumption calculation failed: ${err instanceof Error ? err.message : String(err)}`);
@@ -170,6 +174,7 @@ async function main(adapter) {
 	const writes = [];
 	if (!initialized) {
 		if (alive && alive.val) adapter.log.warn("Missing consumption baseline; initializing without inventing historical consumption");
+		adapter.log.info("Consumption baseline initialized; the first daily consumption is calculated after the next calendar day begins.");
 		writes.push([`${calcPath(config, year)}.dayLastValue`, source.val], [markerPath, key]);
 	} else if (!processed || processed < key) {
 		writes.push(...await calcValue(adapter, yesterday, baseline.val, source.val));
@@ -185,6 +190,31 @@ async function main(adapter) {
 	await write(adapter, `${root}.calc.pendingCalculation`, serialized);
 	await applyPending(adapter, serialized);
 	if (config.day) await newstastic(adapter, today);
+	if (config.convert) await convertValues(adapter);
+}
+
+async function convertValues(adapter) {
+	const { medium, unit, convertunit } = adapter.config;
+	const factor = unit === convertunit ? 1 : unit === "m³" ? 1000 : 0.001;
+	const states = await adapter.getStatesAsync(`${medium}.*`);
+	// Derive a separate view so switching units cannot mix stored consumption or baselines.
+	const prefix = `${adapter.namespace}.${medium}.`;
+	for (const [id, state] of Object.entries(states)) {
+		if (!id.startsWith(prefix)) continue;
+		const relative = id.slice(prefix.length);
+		if (!/^(?:instanceValue|statistic\.Average(?:Day|TwoDays|SevenDays)|(?:\d{4}\.)?calc\.(?:day|week|month|year)(?:Last|Diff)Value|\d{4}\.(?:day\.\d{1,3}\.dayValue|month\.\d{1,2}\.(?:monthValue|\d{1,2}\.dayValue)|week\.\d{1,2}\.(?:weekValue|[1-7]\.dayValue)|year\.yearValue))$/.test(relative)) continue;
+		const target = `${medium}.converted.${convertunit === "L" ? "L" : "m3"}.${relative}`;
+		const value = numeric(state) ? Number((state.val * factor).toFixed(6)) : null;
+		if (value !== null && !Number.isFinite(value)) throw new Error(`Conversion overflow for ${id}`);
+		await adapter.setObjectNotExistsAsync(target, {
+			type: "state",
+			common: { name: relative, type: "number", role: "value", read: true, write: false, def: null, unit: convertunit },
+			native: {},
+		});
+		if (!states[`${adapter.namespace}.${target}`] || states[`${adapter.namespace}.${target}`].val !== value) {
+			await write(adapter, target, value);
+		}
+	}
 }
 
 function oilConsumption(a, b) {

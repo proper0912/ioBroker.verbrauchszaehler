@@ -1,8 +1,12 @@
 {
   "common": {
     "name": "verbrauchszaehler",
-    "version": "0.0.12",
+    "version": "0.0.13",
     "news": {
+      "0.0.13": {
+        "en": "(proper0912) Implement litre/cubic-metre conversion in additional data points while preserving source history; explain initialization and test reported water readings.",
+        "de": "(proper0912) Liter-/Kubikmeter-Umrechnung in zusätzlichen Datenpunkten ergänzt, Quellhistorie erhalten sowie Initialisierung erklärt und gemeldete Wasserstände getestet."
+      },
       "0.0.12": {
         "en": "(proper0912) Add cumulative water meters in separate instances with decimal consumption, reset handling and regression tests; repair GitHub Actions.",
         "de": "(proper0912) Wasser-Gesamtzähler in getrennten Instanzen mit Nachkommastellen, Reset-Behandlung und Regressionstests ergänzt; GitHub Actions repariert."
@@ -193,6 +197,8 @@
     "triggerID": "",
     "medium": "",
     "unit": "",
+    "convert": false,
+    "convertunit": "",
     "day": true,
     "week": false,
     "month": false,

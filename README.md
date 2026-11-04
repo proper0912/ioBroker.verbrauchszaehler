@@ -54,9 +54,17 @@ und die vorhandene Öl-Instanz weiterverwenden. In der neuen Instanz:
 
 1. Als Medium **Wasser** wählen.
 2. Den Datenpunkt mit dem fortlaufenden Gesamtzählerstand auswählen.
-3. **L** oder **m³** passend zur Quelle wählen. Die Werte werden in dieser Einheit
-   gespeichert; eine automatische Umrechnung erfolgt nicht.
+3. **L** oder **m³** passend zur Quelle wählen. Die bisherigen Datenpunkte bleiben
+   in der Einheit der Quelle.
 4. Gewünschte Tages-, Wochen-, Monats- und Jahresauswertungen aktivieren.
+5. Optional **Umrechnen** aktivieren und die Zieleinheit wählen. Die umgerechneten
+   Werte stehen zusätzlich unter `water.converted.L` beziehungsweise
+   `water.converted.m3`. Für den Vortagesverbrauch in Litern beispielsweise
+   `verbrauchszaehler.1.water.converted.L.statistic.AverageDay` verwenden.
+   Die Umrechnung funktioniert auch für die Öl-Instanz unter `oil.converted`.
+   Vorhandene Messwerte und Historien werden dabei nicht überschrieben.
+   Nach dem Abschalten der Umrechnung werden die zusätzlichen Werte nicht mehr
+   aktualisiert; bei erneuter Aktivierung werden sie aus den Originalwerten aufgebaut.
 
 Die Wasserwerte liegen unter `verbrauchszaehler.<Instanz>.water`, mit derselben
 Struktur wie bei Öl. Beispielsweise enthält `water.statistic.AverageDay` den
@@ -65,6 +73,10 @@ Differenzen, Summen und Durchschnitte erhalten bis zu sechs Nachkommastellen;
 die Ölberechnung einschließlich Nachfüllerkennung bleibt unverändert.
 
 Beim ersten Start wird der aktuelle Zählerstand als Ausgangswert übernommen.
+Bis zum ersten Lauf am nächsten Kalendertag bleiben die Verbrauchswerte `null`.
+Ein neuer Messwert am selben Tag aktualisiert den angezeigten Zählerstand,
+noch nicht den abgeschlossenen Tagesverbrauch. Die Einträge unter `calc` sind
+interne Berechnungsgrundlagen; für Meldungen die Werte unter `statistic` verwenden.
 Ein sinkender Wasserzählerstand wird als Reset oder Zählerwechsel behandelt:
 Der neue Stand wird zur Basis, der betroffene Tag bleibt unbekannt (`null`) und
 die vorhandenen Summen bleiben erhalten. Verbrauch während dieses Intervalls
@@ -94,6 +106,10 @@ and the physical tank sensor still need a manual check before deployment.
   ### **WORK IN PROGRESS**
 -->
 ### **WORK IN PROGRESS**
+
+### 0.0.13 (2026-11-04)
+* (proper0912) Implement the existing conversion option for litres and cubic metres in additional converted.L/converted.m3 data points, preserving original readings, history and oil refill calibration.
+* (proper0912) Explain unknown daily consumption during initialization and add regression tests for the reported water readings, conversion, target changes and interrupted conversion writes.
 * (proper0912) Enable token-free npm trusted publishing and allow a verified existing release tag to be published manually without changing the tag or GitHub release notes.
 
 ### 0.0.12 (2026-11-01)
