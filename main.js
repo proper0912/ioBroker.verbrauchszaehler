@@ -70,11 +70,85 @@ function numeric(state) {
 	return state && typeof state.val === "number" && Number.isFinite(state.val);
 }
 
+function outputUnit(config) {
+	return config.convert ? config.convertunit : config.unit;
+}
+
+function measurement(config, id) {
+	if (!id.startsWith(`${config.medium}.`)) return false;
+	return /^(?:instanceValue|statistic\.Average(?:Day|TwoDays|SevenDays)|(?:\d{4}\.)?calc\.(?:day|week|month|year)(?:Last|Diff)Value|\d{4}\.(?:day\.\d{1,3}\.dayValue|month\.\d{1,2}\.(?:monthValue|\d{1,2}\.dayValue)|week\.\d{1,2}\.(?:weekValue|[1-7]\.dayValue)|year\.yearValue))$/.test(id.slice(config.medium.length + 1));
+}
+
+function scaleValue(id, value, from, to) {
+	if (value === null || from === to || value === -1 && id.endsWith(".dayValue")) return value;
+	if (!["L", "m³"].includes(from) || !["L", "m³"].includes(to) || !Number.isFinite(value)) {
+		throw new Error(`Cannot convert ${id} from ${from} to ${to}`);
+	}
+	const result = Number((value * (from === "m³" ? 1000 : 0.001)).toFixed(9));
+	if (!Number.isFinite(result)) throw new Error(`Conversion overflow for ${id}`);
+	return result;
+}
+
+async function readState(adapter, id) {
+	const state = await adapter.getStateAsync(id);
+	return state && measurement(adapter.config, id)
+		? { ...state, val: scaleValue(id, state.val, outputUnit(adapter.config), adapter.config.unit) } : state;
+}
+
+async function migrateUnit(adapter) {
+	const config = adapter.config;
+	const unitPath = `${config.medium}.calc.outputUnit`;
+	const pendingPath = `${config.medium}.calc.pendingUnitConversion`;
+	const pending = await adapter.getStateAsync(pendingPath);
+	if (pending && pending.val) await applyUnitMigration(adapter, pending.val);
+	const stored = await adapter.getStateAsync(unitPath);
+	const target = outputUnit(config);
+	if (stored && stored.val === target || !stored && !config.convert) return;
+	if (stored && !["L", "m³"].includes(stored.val)) throw new Error("Invalid stored output unit");
+	const states = await adapter.getStatesAsync(`${config.medium}.*`);
+	const objects = await adapter.getAdapterObjectsAsync();
+	const prefix = `${adapter.namespace}.`;
+	const writes = [];
+	for (const [fullId, state] of Object.entries(states)) {
+		if (!fullId.startsWith(prefix)) continue;
+		const id = fullId.slice(prefix.length);
+		if (!measurement(config, id)) continue;
+		const object = objects[fullId];
+		const from = stored ? stored.val : object && object.common.unit || config.unit;
+		writes.push([id, scaleValue(id, state.val, from, target)]);
+	}
+	await ensureState(adapter, pendingPath, "string", "");
+	const serialized = JSON.stringify({ unit: target, writes });
+	await write(adapter, pendingPath, serialized);
+	await applyUnitMigration(adapter, serialized);
+}
+
+async function applyUnitMigration(adapter, serialized) {
+	const plan = JSON.parse(serialized);
+	if (!plan || !["L", "m³"].includes(plan.unit) || !Array.isArray(plan.writes)
+		|| !plan.writes.every(entry => Array.isArray(entry) && entry.length === 2
+			&& typeof entry[0] === "string" && measurement(adapter.config, entry[0])
+			&& (entry[1] === null || Number.isFinite(entry[1])))) {
+		throw new Error("Invalid pending unit conversion; refusing to overwrite states");
+	}
+	// Replay absolute values and metadata before advancing the unit marker, even after a restart.
+	for (const [id, val] of plan.writes) {
+		await adapter.setStateAsync(id, { val, ack: true });
+		await adapter.extendObjectAsync(id, { common: { unit: plan.unit } });
+	}
+	await ensureState(adapter, "year", "number", 0);
+	await adapter.extendObjectAsync("year", { common: { unit: "" } });
+	const unitPath = `${adapter.config.medium}.calc.outputUnit`;
+	await ensureState(adapter, unitPath, "string", "");
+	await write(adapter, unitPath, plan.unit);
+	await write(adapter, `${adapter.config.medium}.calc.pendingUnitConversion`, "");
+}
+
 async function readDay(adapter, date) {
-	const state = await adapter.getStateAsync(dayPath(adapter.config, date));
+	const state = await readState(adapter, dayPath(adapter.config, date));
 	if (numeric(state)) return state;
 	// Keep history readable when the user switches between the two existing daily layouts.
-	return adapter.getStateAsync(dayPath({ ...adapter.config, month: !adapter.config.month }, date));
+	return readState(adapter, dayPath({ ...adapter.config, month: !adapter.config.month }, date));
 }
 
 async function ensureState(adapter, id, type = "number", def = null) {
@@ -83,14 +157,15 @@ async function ensureState(adapter, id, type = "number", def = null) {
 		common: {
 			name: id.split(".").pop(), type, role: type === "number" ? "value" : "state",
 			read: true, write: true, def,
-			...(type === "number" && adapter.config.unit ? { unit: adapter.config.unit } : {}),
+			...(measurement(adapter.config, id) && outputUnit(adapter.config) ? { unit: outputUnit(adapter.config) } : {}),
 		},
 		native: {},
 	});
 }
 
 async function write(adapter, id, val) {
-	await adapter.setStateAsync(id, { val, ack: true });
+	await adapter.setStateAsync(id, { val: measurement(adapter.config, id)
+		? scaleValue(id, val, adapter.config.unit, outputUnit(adapter.config)) : val, ack: true });
 }
 
 async function ensureYear(adapter, year) {
@@ -138,15 +213,16 @@ async function main(adapter) {
 		throw new Error(`Source ${config.triggerID} must contain a finite numeric value${config.medium === "water" ? " greater than or equal to zero" : ""}`);
 	}
 
+	await migrateUnit(adapter);
 	await ensureState(adapter, `${root}.calc.pendingCalculation`, "string", "");
-	const pending = await adapter.getStateAsync(`${root}.calc.pendingCalculation`);
+	const pending = await readState(adapter, `${root}.calc.pendingCalculation`);
 	if (pending && pending.val) await applyPending(adapter, pending.val);
 
-	const alive = await adapter.getStateAsync("alive");
-	const storedYear = await adapter.getStateAsync("year");
+	const alive = await readState(adapter, "alive");
+	const storedYear = await readState(adapter, "year");
 	const previousYear = numeric(storedYear) && storedYear.val > 0 ? storedYear.val : year;
-	const baseline = await adapter.getStateAsync(`${calcPath(config, previousYear)}.dayLastValue`);
-	const marker = await adapter.getStateAsync(markerPath);
+	const baseline = await readState(adapter, `${calcPath(config, previousYear)}.dayLastValue`);
+	const marker = await readState(adapter, markerPath);
 	if (marker && marker.val != null && marker.val !== "" && !isDateKey(marker.val)) {
 		throw new Error("Invalid last processed date; refusing to recalculate historical consumption");
 	}
@@ -190,32 +266,8 @@ async function main(adapter) {
 	await write(adapter, `${root}.calc.pendingCalculation`, serialized);
 	await applyPending(adapter, serialized);
 	if (config.day) await newstastic(adapter, today);
-	if (config.convert) await convertValues(adapter);
 }
 
-async function convertValues(adapter) {
-	const { medium, unit, convertunit } = adapter.config;
-	const factor = unit === convertunit ? 1 : unit === "m³" ? 1000 : 0.001;
-	const states = await adapter.getStatesAsync(`${medium}.*`);
-	// Derive a separate view so switching units cannot mix stored consumption or baselines.
-	const prefix = `${adapter.namespace}.${medium}.`;
-	for (const [id, state] of Object.entries(states)) {
-		if (!id.startsWith(prefix)) continue;
-		const relative = id.slice(prefix.length);
-		if (!/^(?:instanceValue|statistic\.Average(?:Day|TwoDays|SevenDays)|(?:\d{4}\.)?calc\.(?:day|week|month|year)(?:Last|Diff)Value|\d{4}\.(?:day\.\d{1,3}\.dayValue|month\.\d{1,2}\.(?:monthValue|\d{1,2}\.dayValue)|week\.\d{1,2}\.(?:weekValue|[1-7]\.dayValue)|year\.yearValue))$/.test(relative)) continue;
-		const target = `${medium}.converted.${convertunit === "L" ? "L" : "m3"}.${relative}`;
-		const value = numeric(state) ? Number((state.val * factor).toFixed(6)) : null;
-		if (value !== null && !Number.isFinite(value)) throw new Error(`Conversion overflow for ${id}`);
-		await adapter.setObjectNotExistsAsync(target, {
-			type: "state",
-			common: { name: relative, type: "number", role: "value", read: true, write: false, def: null, unit: convertunit },
-			native: {},
-		});
-		if (!states[`${adapter.namespace}.${target}`] || states[`${adapter.namespace}.${target}`].val !== value) {
-			await write(adapter, target, value);
-		}
-	}
-}
 
 function oilConsumption(a, b) {
 	let c = 0;
@@ -315,20 +367,20 @@ async function calcValue(adapter, date, previous, current) {
 	if (config.week) {
 		const { year, week } = isoWeek(date);
 		const path = `${config.medium}.${year}.week.${week}`;
-		const total = await adapter.getStateAsync(`${path}.weekValue`);
+		const total = await readState(adapter, `${path}.weekValue`);
 		const sum = consumptionPrecision(config, (numeric(total) ? total.val : 0) + value);
 		writes.push([`${path}.${(date.getDay() + 6) % 7 + 1}.dayValue`, value],
 			[`${path}.weekValue`, sum], [`${root}.calc.weekLastValue`, sum], [`${root}.calc.weekDiffValue`, sum]);
 	}
 	if (config.month) {
 		const path = `${root}.month.${date.getMonth() + 1}.monthValue`;
-		const total = await adapter.getStateAsync(path);
+		const total = await readState(adapter, path);
 		const sum = consumptionPrecision(config, (numeric(total) ? total.val : 0) + value);
 		writes.push([path, sum], [`${root}.calc.monthLastValue`, sum], [`${root}.calc.monthDiffValue`, sum]);
 	}
 	if (config.year) {
 		const path = `${root}.year.yearValue`;
-		const total = await adapter.getStateAsync(path);
+		const total = await readState(adapter, path);
 		const sum = consumptionPrecision(config, (numeric(total) ? total.val : 0) + value);
 		writes.push([path, sum], [`${root}.calc.yearLastValue`, sum], [`${root}.calc.yearDiffValue`, sum]);
 	}

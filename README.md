@@ -54,17 +54,32 @@ und die vorhandene Öl-Instanz weiterverwenden. In der neuen Instanz:
 
 1. Als Medium **Wasser** wählen.
 2. Den Datenpunkt mit dem fortlaufenden Gesamtzählerstand auswählen.
-3. **L** oder **m³** passend zur Quelle wählen. Die bisherigen Datenpunkte bleiben
-   in der Einheit der Quelle.
+3. **L** oder **m³** passend zur Quelle wählen. Diese Einstellung beschreibt
+   weiterhin die Einheit des gelieferten Zählerstands.
 4. Gewünschte Tages-, Wochen-, Monats- und Jahresauswertungen aktivieren.
-5. Optional **Umrechnen** aktivieren und die Zieleinheit wählen. Die umgerechneten
-   Werte stehen zusätzlich unter `water.converted.L` beziehungsweise
-   `water.converted.m3`. Für den Vortagesverbrauch in Litern beispielsweise
-   `verbrauchszaehler.1.water.converted.L.statistic.AverageDay` verwenden.
-   Die Umrechnung funktioniert auch für die Öl-Instanz unter `oil.converted`.
-   Vorhandene Messwerte und Historien werden dabei nicht überschrieben.
-   Nach dem Abschalten der Umrechnung werden die zusätzlichen Werte nicht mehr
-   aktualisiert; bei erneuter Aktivierung werden sie aus den Originalwerten aufgebaut.
+5. Optional **Umrechnen** aktivieren und die Zieleinheit wählen. Ab Version 0.0.14
+   gilt diese für alle bisherigen Messwert-Datenpunkte: Zählerstand, Tages-,
+   Wochen-, Monats-, Jahreswerte, Statistiken und Berechnungsgrundlagen unter `calc`.
+   Für den Vortagesverbrauch weiterhin
+   `verbrauchszaehler.1.water.statistic.AverageDay` verwenden.
+   Bei **m³ → L** steht dort der Verbrauch in Litern; **1 m³ = 1000 L**.
+   Auch die Öl-Instanz verwendet die gewählte Zieleinheit; die Nachfüllerkennung
+   rechnet intern weiterhin in der Quelleinheit.
+
+Beim Aktivieren, Abschalten oder Wechseln der Zieleinheit werden die bereits
+gespeicherten Adapterwerte aller Jahre und deren Einheiten passend umgerechnet.
+`null` bleibt unbekannt; alte Tageswerte mit dem Initialisierungswert `-1` bleiben
+unverändert. Ein unterbrochener Vorgang wird anhand gespeicherter absoluter Werte
+fortgesetzt. Die internen Zustände `calc.outputUnit` und
+`calc.pendingUnitConversion` deshalb nicht manuell ändern. Die Umrechnung erhält
+bis zu neun Nachkommastellen. Datumsangaben, Verarbeitungsmarker und das Jahr
+werden nicht mit einem Mengenfaktor multipliziert.
+
+Die externen Messreihen von History-, SQL- oder InfluxDB-Adaptern werden nicht
+nachträglich umgerechnet. Dort können alte Werte weiterhin in der vorherigen
+Einheit vorliegen. Die ab Version 0.0.13 angelegten `converted`-Datenpunkte bleiben
+erhalten, werden ab 0.0.14 aber nicht mehr aktualisiert; vorhandene Verweise
+auf die bisherigen Messwert-Datenpunkte zurückstellen.
 
 Die Wasserwerte liegen unter `verbrauchszaehler.<Instanz>.water`, mit derselben
 Struktur wie bei Öl. Beispielsweise enthält `water.statistic.AverageDay` den
@@ -106,6 +121,11 @@ and the physical tank sensor still need a manual check before deployment.
   ### **WORK IN PROGRESS**
 -->
 ### **WORK IN PROGRESS**
+
+### 0.0.14 (2026-11-04)
+* (proper0912) Apply the selected output unit directly to all existing measurement data points, including readings, daily and period totals, statistics and calculation baselines; preserve oil refill calibration.
+* (proper0912) Migrate stored adapter values and unit metadata across all years with durable replay after interrupted writes; retain unknown values and legacy initialization markers, and stop updating the additional converted data points.
+* (proper0912) Add regression tests for output changes, migration recovery, pending consumption writes, New Year and meter resets; document that external database history is not rewritten.
 
 ### 0.0.13 (2026-11-04)
 * (proper0912) Implement the existing conversion option for litres and cubic metres in additional converted.L/converted.m3 data points, preserving original readings, history and oil refill calibration.

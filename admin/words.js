@@ -3,9 +3,9 @@
 "use strict";
 
 systemDictionary = {
-  "Converted values are added under converted.L or converted.m3. Original values keep the source unit.": {
-    "en": "Converted values are added under converted.L or converted.m3. Original values keep the source unit.",
-    "de": "Umgerechnete Werte stehen zusätzlich unter converted.L oder converted.m3. Die bisherigen Werte behalten die Einheit der Quelle."
+  "Conversion applies to all existing measurement data points, including stored adapter values. External database history is not converted.": {
+    "en": "Conversion applies to all existing measurement data points, including stored adapter values. External database history is not converted.",
+    "de": "Die Umrechnung gilt für alle bisherigen Messwert-Datenpunkte und gespeicherten Adapterwerte. Externe Datenbankhistorien werden nicht umgerechnet."
   },
   "Main settings":                          { "en": "Main settings",                          "de": "Haupteinstellungen",                     "ru": "Основные параметры",                           "uk":"Основні налаштування",                                    "pt": "Configurações principais",                           "nl": "Belangrijkste instellingen",             "fr": "Réglages principaux",                                  "it": "Impostazioni principali",                        "es": "Ajustes principales",                                  "pl": "Ustawienia główne",                                            "zh-cn": "主要设定" },
   "Object ID: (oil tank level or water meter total)": {"en": "Object ID: (oil tank level or water meter total)", "de": "Objekt-ID: (Öltankfüllstand oder Wasser-Gesamtzählerstand)", "ru": "ID объекта: (уровень масла в баке или общий показатель счётчика воды)", "uk": "ID об’єкта: (рівень олії в баку або загальний показник лічильника води)", "pt": "ID do objeto: (nível do tanque de óleo ou total do contador de água)", "nl": "Object-ID: (olietankniveau of totale watermeterstand)", "fr": "ID objet : (niveau de la cuve de fioul ou index total du compteur d’eau)", "it": "ID oggetto: (livello del serbatoio dell’olio o lettura totale del contatore dell’acqua)", "es": "ID del objeto: (nivel del depósito de aceite o lectura total del contador de agua)", "pl": "ID obiektu: (poziom oleju w zbiorniku lub całkowity odczyt wodomierza)", "zh-cn": "对象 ID：（油箱液位或水表累计读数）"},

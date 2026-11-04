@@ -1,8 +1,12 @@
 {
   "common": {
     "name": "verbrauchszaehler",
-    "version": "0.0.13",
+    "version": "0.0.14",
     "news": {
+      "0.0.14": {
+        "en": "(proper0912) Apply conversion to all existing measurement data points and safely migrate stored adapter values and unit metadata with interruption recovery.",
+        "de": "(proper0912) Umrechnung auf alle bisherigen Messwert-Datenpunkte anwenden und gespeicherte Adapterwerte samt Einheiten mit Wiederaufnahme nach Abbrüchen umstellen."
+      },
       "0.0.13": {
         "en": "(proper0912) Implement litre/cubic-metre conversion in additional data points while preserving source history; explain initialization and test reported water readings.",
         "de": "(proper0912) Liter-/Kubikmeter-Umrechnung in zusätzlichen Datenpunkten ergänzt, Quellhistorie erhalten sowie Initialisierung erklärt und gemeldete Wasserstände getestet."
