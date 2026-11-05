@@ -254,7 +254,7 @@ async function main(adapter) {
 	const writes = [];
 	if (!initialized || modeChanged) {
 		if (modeChanged) adapter.log.warn("Water mode changed; rebasing without calculating consumption across different modes.");
-		if (alive && alive.val) adapter.log.warn("Missing consumption baseline; initializing without inventing historical consumption");
+		if (!initialized && alive && alive.val) adapter.log.warn("Missing consumption baseline; initializing without inventing historical consumption");
 		adapter.log.info("Consumption baseline initialized; the first daily consumption is calculated after the next calendar day begins.");
 		writes.push([`${calcPath(config, year)}.dayLastValue`, source.val], [markerPath, key]);
 	} else if (!processed || processed < key) {
