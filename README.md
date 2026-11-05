@@ -22,7 +22,7 @@ Your total consumption from the start of the adapter.
 
 Der Adapter unterstützt Öl und Wasser in getrennten Instanzen. Die Quelle muss
 einen endlichen numerischen Tankfüllstand für Öl beziehungsweise einen
-fortlaufenden Gesamtzählerstand für Wasser liefern. Tages-, Wochen-, Monats- und Jahresauswertung können
+fortlaufenden Gesamtzählerstand oder einen Tankfüllstand für Wasser liefern. Tages-, Wochen-, Monats- und Jahresauswertung können
 unabhängig aktiviert werden. Ohne Monatsauswertung liegen Tageswerte unter
 `oil.<Jahr>.day.<TagDesJahres>.dayValue`, mit Monatsauswertung unter
 `oil.<Jahr>.month.<Monat>.<Tag>.dayValue`. Wochen verwenden ISO-Kalenderwoche und
@@ -53,7 +53,9 @@ Für Wasser eine zusätzliche Instanz anlegen, beispielsweise `verbrauchszaehler
 und die vorhandene Öl-Instanz weiterverwenden. In der neuen Instanz:
 
 1. Als Medium **Wasser** wählen.
-2. Den Datenpunkt mit dem fortlaufenden Gesamtzählerstand auswählen.
+2. Die **Messart** wählen: **Wasserverbrauch: steigender Gesamtzähler** oder
+   **Wasserfüllstand: sinkender Tankinhalt**. Den passenden Quelldatenpunkt auswählen.
+   Bestehende Instanzen verwenden weiterhin den steigenden Gesamtzähler.
 3. **L** oder **m³** passend zur Quelle wählen. Diese Einstellung beschreibt
    weiterhin die Einheit des gelieferten Zählerstands.
 4. Gewünschte Tages-, Wochen-, Monats- und Jahresauswertungen aktivieren.
@@ -83,7 +85,8 @@ auf die bisherigen Messwert-Datenpunkte zurückstellen.
 
 Die Wasserwerte liegen unter `verbrauchszaehler.<Instanz>.water`, mit derselben
 Struktur wie bei Öl. Beispielsweise enthält `water.statistic.AverageDay` den
-Verbrauch des Vortags. Berechnet wird die Zunahme des Gesamtzählerstands.
+Verbrauch des Vortags. Beim Gesamtzähler wird die Zunahme berechnet,
+beim Füllstand die Abnahme: **1000 L → 900 L = 100 L Verbrauch**.
 Differenzen, Summen und Durchschnitte erhalten bis zu sechs Nachkommastellen;
 die Ölberechnung einschließlich Nachfüllerkennung bleibt unverändert.
 
@@ -92,11 +95,15 @@ Bis zum ersten Lauf am nächsten Kalendertag bleiben die Verbrauchswerte `null`.
 Ein neuer Messwert am selben Tag aktualisiert den angezeigten Zählerstand,
 noch nicht den abgeschlossenen Tagesverbrauch. Die Einträge unter `calc` sind
 interne Berechnungsgrundlagen; für Meldungen die Werte unter `statistic` verwenden.
-Ein sinkender Wasserzählerstand wird als Reset oder Zählerwechsel behandelt:
+Im Gesamtzähler-Modus wird ein sinkender Stand als Reset oder Zählerwechsel behandelt.
+Im Füllstand-Modus gilt ein steigender Stand als Nachfüllung:
 Der neue Stand wird zur Basis, der betroffene Tag bleibt unbekannt (`null`) und
 die vorhandenen Summen bleiben erhalten. Verbrauch während dieses Intervalls
 lässt sich ohne weitere Messwerte nicht rekonstruieren. Negative Zählerstände,
 Tagesverbrauchswerte und einzelne Impulse eignen sich nicht als Quelle.
+Auch beim Wechsel der Messart wird zunächst eine neue Basis gesetzt;
+für das überbrückte Intervall wird kein Verbrauch erfunden. Gespeicherte
+Verbrauchswerte bleiben erhalten. `water.calc.mode` nicht manuell ändern.
 
 ### Development checks
 
@@ -121,6 +128,10 @@ and the physical tank sensor still need a manual check before deployment.
   ### **WORK IN PROGRESS**
 -->
 ### **WORK IN PROGRESS**
+
+### 0.0.16 (2026-11-05)
+* (proper0912) Add a water measurement setting for increasing cumulative consumption meters or decreasing tank levels; preserve the counter default for existing instances.
+* (proper0912) Treat level increases as refills with unknown interval consumption, rebase safely on mode changes and add tests for both units, conversion, refills and existing settings.
 
 ### 0.0.15 (2026-11-04)
 * (proper0912) Remove legacy volume units from the year data point on every successful run for oil and water, independently of output conversion; preserve measurement units and the automatic year change.

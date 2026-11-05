@@ -3,6 +3,9 @@
 "use strict";
 
 systemDictionary = {
+  "Water: increasing consumption meter": { "en": "Water: increasing consumption meter", "de": "Wasserverbrauch: steigender Gesamtzähler" },
+  "Water: decreasing tank level": { "en": "Water: decreasing tank level", "de": "Wasserfüllstand: sinkender Tankinhalt" },
+  "Water measurement (only for water)": { "en": "Water measurement (only for water)", "de": "Messart (nur bei Wasser)" },
   "Conversion applies to all existing measurement data points, including stored adapter values. External database history is not converted.": {
     "en": "Conversion applies to all existing measurement data points, including stored adapter values. External database history is not converted.",
     "de": "Die Umrechnung gilt für alle bisherigen Messwert-Datenpunkte und gespeicherten Adapterwerte. Externe Datenbankhistorien werden nicht umgerechnet."

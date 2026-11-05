@@ -1,8 +1,12 @@
 {
   "common": {
     "name": "verbrauchszaehler",
-    "version": "0.0.15",
+    "version": "0.0.16",
     "news": {
+      "0.0.16": {
+        "en": "(proper0912) Add water counter/tank level selection with refill handling and safe baseline reset on mode changes.",
+        "de": "(proper0912) Auswahl zwischen Wasser-Gesamtzähler und Tankfüllstand mit Nachfüllerkennung und neuer Berechnungsbasis bei Messartwechsel ergänzt."
+      },
       "0.0.15": {
         "en": "(proper0912) Clear legacy units from the year state independently of conversion for oil and water.",
         "de": "(proper0912) Alte Einheiten am Jahres-Datenpunkt für Öl und Wasser unabhängig von der Umrechnung entfernen."
@@ -204,6 +208,7 @@
   "native": {
     "triggerID": "",
     "medium": "",
+    "waterMode": "counter",
     "unit": "",
     "convert": false,
     "convertunit": "",

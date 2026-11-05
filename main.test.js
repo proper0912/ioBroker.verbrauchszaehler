@@ -59,6 +59,59 @@ describe("consumption adapter", () => {
 		states.set(id, { val });
 	}
 
+	for (const unit of ["L", "m³"]) {
+		it(`calculates decreasing water levels, refill gaps and zero consumption in ${unit}`, async () => {
+			Object.assign(adapter.config, { medium: "water", waterMode: "level", unit, convert: true, convertunit: "L", week: true, month: true, year: true });
+			const scale = unit === "L" ? 1 : 0.001;
+			await run(new Date(2026, 10, 2, 0, 5), 1000 * scale);
+			await run(new Date(2026, 10, 3, 0, 5), 900 * scale);
+			for (const id of ["water.statistic.AverageDay", "water.2026.month.11.monthValue", "water.2026.week.45.weekValue", "water.2026.year.yearValue"]) assert.equal(states.get(id).val, 100, id);
+			await run(new Date(2026, 10, 4, 0, 5), 900 * scale);
+			assert.equal(states.get("water.statistic.AverageDay").val, 0);
+			await run(new Date(2026, 10, 5, 0, 5), 1500 * scale);
+			assert.equal(states.get("water.statistic.AverageDay").val, null);
+			assert.equal(states.get("water.2026.year.yearValue").val, 100);
+			await run(new Date(2026, 10, 6, 0, 5), 1400 * scale);
+			assert.equal(states.get("water.statistic.AverageDay").val, 100);
+			assert.equal(states.get("water.2026.year.yearValue").val, 200);
+			assert.equal(adapter.log.error.callCount, 0);
+		});
+	}
+
+	it("rebases when switching between water counter and level without mixing interval meanings", async () => {
+		Object.assign(adapter.config, { medium: "water", unit: "L" });
+		await run(new Date(2026, 10, 2, 0, 5), 1000);
+		adapter.config.waterMode = "level";
+		await run(new Date(2026, 10, 3, 0, 5), 900);
+		assert.equal(states.get("water.statistic.AverageDay").val, null);
+		assert.equal(states.get("water.calc.mode").val, "level");
+		await run(new Date(2026, 10, 4, 0, 5), 850);
+		assert.equal(states.get("water.statistic.AverageDay").val, 50);
+		adapter.config.waterMode = "counter";
+		await run(new Date(2026, 10, 5, 0, 5), 10000);
+		assert.equal(states.get("water.statistic.AverageDay").val, null);
+		await run(new Date(2026, 10, 6, 0, 5), 10010);
+		assert.equal(states.get("water.statistic.AverageDay").val, 10);
+		assert.equal(adapter.log.error.callCount, 0);
+	});
+
+	it("keeps existing water instances in counter mode when the new setting is absent", async () => {
+		Object.assign(adapter.config, { medium: "water", unit: "L" });
+		delete adapter.config.waterMode;
+		await run(new Date(2026, 10, 2, 0, 5), 1000);
+		states.delete("water.calc.mode");
+		await run(new Date(2026, 10, 3, 0, 5), 1010);
+		assert.equal(states.get("water.statistic.AverageDay").val, 10);
+		assert.equal(states.get("water.calc.mode").val, "counter");
+	});
+
+	it("rejects unsupported water modes before reading or writing data", async () => {
+		Object.assign(adapter.config, { medium: "water", waterMode: "invalid" });
+		await run(new Date(2026, 10, 2, 0, 5));
+		assert.equal(adapter.log.error.callCount, 1);
+		assert.equal(states.size, 0);
+	});
+
 	it("loads without undeclared dependencies and initializes", async () => {
 		await run(new Date(2026, 9, 31, 0, 5));
 		assert.equal(states.get("oil.2026.calc.dayLastValue").val, 1000);

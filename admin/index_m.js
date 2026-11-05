@@ -8,6 +8,7 @@
 
 function load(settings, onChange) {
 	if (!settings) return;
+	settings.waterMode = settings.waterMode || "counter";
 
 	$(".value").each(function () {
 		const $key = $(this);

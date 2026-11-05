@@ -9,6 +9,8 @@ function startAdapter(options = {}) {
 		name: adapterName,
 		ready: async () => {
 			try {
+				if (adapter.config.medium === "water" && adapter.config.waterMode
+					&& !["counter", "level"].includes(adapter.config.waterMode)) throw new Error("Select water counter or level mode");
 				if (!adapter.config.triggerID || !["oil", "water"].includes(adapter.config.medium)) {
 					throw new Error("Configure a triggerID and the medium oil or water");
 				}
@@ -225,6 +227,9 @@ async function main(adapter) {
 		throw new Error("Invalid last processed date; refusing to recalculate historical consumption");
 	}
 	const initialized = alive && alive.val === true && numeric(baseline);
+	const waterMode = config.waterMode || "counter";
+	const storedMode = config.medium === "water" ? await readState(adapter, "water.calc.mode") : null;
+	const modeChanged = config.medium === "water" && initialized && (storedMode && storedMode.val || "counter") !== waterMode;
 	let processed = marker && marker.val;
 	if (initialized && !processed && config.day) {
 		const legacyDay = await readDay(adapter, yesterday);
@@ -247,7 +252,8 @@ async function main(adapter) {
 	await write(adapter, `${root}.connect`, true);
 
 	const writes = [];
-	if (!initialized) {
+	if (!initialized || modeChanged) {
+		if (modeChanged) adapter.log.warn("Water mode changed; rebasing without calculating consumption across different modes.");
 		if (alive && alive.val) adapter.log.warn("Missing consumption baseline; initializing without inventing historical consumption");
 		adapter.log.info("Consumption baseline initialized; the first daily consumption is calculated after the next calendar day begins.");
 		writes.push([`${calcPath(config, year)}.dayLastValue`, source.val], [markerPath, key]);
@@ -260,6 +266,7 @@ async function main(adapter) {
 		if (!marker || !marker.val) writes.push([markerPath, processed]);
 	}
 	writes.push(["alive", true], ["year", year]);
+	if (config.medium === "water") writes.push(["water.calc.mode", waterMode]);
 	// Persist absolute results before writing so a failed run can replay without double counting.
 	const serialized = JSON.stringify(writes);
 	await write(adapter, `${root}.calc.pendingCalculation`, serialized);
@@ -328,6 +335,7 @@ async function applyPending(adapter, serialized) {
 		const [id, value] = entry;
 		if (id === "alive") return value === true;
 		if (id === "year") return Number.isInteger(value) && value >= 1000 && value <= 9999;
+		if (id === "water.calc.mode" && adapter.config.medium === "water") return ["counter", "level"].includes(value);
 		if (id === `${adapter.config.medium}.calc.lastProcessedDate`) return isDateKey(value);
 		if (!id.startsWith(`${adapter.config.medium}.`) || !Number.isFinite(value)) return false;
 		const relative = id.slice(adapter.config.medium.length + 1);
@@ -354,12 +362,13 @@ function consumptionPrecision(config, value) {
 
 async function calcValue(adapter, date, previous, current) {
 	const config = adapter.config;
-	if (config.medium === "water" && current < previous) {
-		adapter.log.warn(`Water meter reading decreased; resetting the baseline. Consumption for ${dateKey(date)} is unknown.`);
+	const level = config.waterMode === "level";
+	if (config.medium === "water" && (level ? current > previous : current < previous)) {
+		adapter.log.warn(`Water ${level ? "level increased (refill)" : "meter reading decreased"}; resetting the baseline. Consumption for ${dateKey(date)} is unknown.`);
 		return [];
 	}
 	const value = config.medium === "water"
-		? consumptionPrecision(config, current - previous) : oilConsumption(current, previous);
+		? consumptionPrecision(config, level ? previous - current : current - previous) : oilConsumption(current, previous);
 	const root = `${config.medium}.${date.getFullYear()}`;
 	const writes = [[`${calcPath(config, date.getFullYear())}.dayDiffValue`, value]];
 	if (config.day) writes.push([dayPath(config, date), value]);
